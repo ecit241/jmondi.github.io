@@ -1,0 +1,202 @@
+<HTML>
+	<HEAD><title>HetNet: A uIP powered board</title> </HEAD>
+
+	<H1>HetNet: A uIP powered custom board</H1>
+	<i>jacopo mondi<br> Suggestions, corrections, everything: jacopo.mondi[AT]gmail[DOT]com</i><br>
+	<i>Special thanks to Matteo Marras for the mobile application development and for his smartness</i>
+	<p>
+	<address>tags:IOT, Internet of things, networked embedded systems, uIP, Contiki, Atmel ATMega, enc28j60</address>
+	<BODY>
+
+<h2>Pre:</h2>
+With embedded sensors becoming even more cheaper and even more numerous, needs for a more standardized form of
+communication arise day by day.
+<br>Standard protocols, like <i>ZigBee</i> are slowly moving away from the <i>isolated sensor network</i> communication
+model, embracing new paradigms based upon new standards and methodologies.<br>
+Thanks to the introduction of <i>IPv6</i> and new network protocols, like <i>6LowPan</i>, sensor networks are 
+rapidly becoming first class citizens on the internet network. 
+<p>
+Standard protocols and tools, employed every day on the internet, such as TCP/IP, network monitoring
+tools and network equipment, are now available also for sensor networks, since those are becoming everyday 
+more integrated in the existing infrastructure. 
+<p>
+<b>HetNet</b> <i>(Heterogeneous Networking)</i> is a simple custom board built to demonstrate the potential of 
+<b>IP-enabled</b> networked embedded devices.<br>Using the <a href="http://www.sics.se/%7Eadam/mobisys2003.pdf"> <b>uIP</b></a> embedded TCP/IP stack, it is possible to build with few lines of code a working HTTP server or an SMTP clients,
+just to name a few of the existing examples.
+<p>
+The experiment is performed in conjunction with an <i>augmented reality</i> application, 
+for a mobile device, that provides a visual feedback of a physical phenomenon, the distance between an hand and 
+the board.
+<br>The test-bed is realized by means of standard network equipment and the interaction between the mobile application and
+the sensor board is performed with standard HTTP requests/responses.
+<br>The board also exposes an auto-refreshing web page that displays sensed data and is reachable with a standard
+browser.
+<p>
+Main inspiration for the experiment comes from SICS' <a href="http://www.contiki-os.org/2011/08/ipsn-2010-demo-ip-based-sensor-network.html"> demo </a> presented at  <i>IPSN 2010</i>.
+
+<h2>Hardware building blocks</h2>
+HetNet is an hand-made board, inspired by the numerous existing boards equipped with an Ethernet interface.
+<br> One of the most known is <a href="http://tuxgraphics.org/electronics/200611/embedded-webserver.shtml">TuxGraphics's Ethernet board</a>, but also the <a href="http://www.arduino.cc/en/Main/ArduinoEthernetShield"> Arduino Ethernet shield</a> is a known example.
+<p>
+To minimize the need of writing new drivers or porting existing code to a new architecture, standard components
+have been chosen as building blocks for the project.
+<p>
+It can seems strange speaking of wireless sensor networks, while employing an Ethernet enabled board, but as of today 
+is possible to switch to another kind of network interface quite straightforwardly.
+<br>Many wireless interfaces that can be employed with micro-controllers exist today. Ranging from 802.11 radios, 
+controlled by means of serial AT commands, to 802.15.4 interfaces sometimes integrated within the micro.
+<br>Switching to a new interface is simply a question of writing a new minimal device driver, with a minimal 
+hardware integration effort.
+
+<h3>Micro and Ethernet Controller</h3>
+The board is built around two main components, an <a href="http://www.atmel.com/dyn/products/product_card.asp?part_id=4198"> ATMega328p micro-controller</a> and an <a href="http://olimex.com/dev/index.html"> ENC28J60 Ethernet controller based board by Olimex</a> .<br>
+The board is also equipped with an RS232 connector to provide a serial debugging interface and an ISP connector to program
+the ATMega chip. To perform the translation from TTL logical levels found on the ATMega serial port a standard MAX3232 IC has been employed.<br>
+The total board cost is around 30E, if industrialized a board like this one can cost less that 10E.
+<p>
+
+<p>
+<h3>Powering and Clock</h3>
+The ATMega is powered at 3.3V for compatibility reasons with ENC28J60 chip, and is clocked using the internal 8MHz 
+RC-oscillator.
+<br>This is usually a bad design choice, because RC oscillators provide less precision than external 
+crystal resonators, but since this is a prototype board, designed to run for short periods, that setup will fit our 
+needs in an acceptable way. 
+
+<p>
+<h3>Sensors</h3>
+The board is also equipped with an external range finder.
+<br> A range finder is a sensor that, by means of an internal sonar, is
+able to understand the distance between itself and an item residing in front of it. For the experiment an <a href="http://www.maxbotix.com/products/MB1010.htm">LV-MaxSonar-EZ1</a>
+manufactured by MaxBotix has been employed.
+<br>This sensor supports various output formats, such as serial digital output, PWM and an analog voltage output.
+The latter has been chosen because of its simplicity.
+
+<h2>Software building blocks</h2>
+<h3>The uIP embedded TCP/IP stack</h3>
+The <b>uIP</b> TCP/IP stack has been designed in 2003 by Adam Dunkels, and is targeted specifically for networked 
+embedded devices with few Kbytes of memory.<br>
+It provides and RFC-compliant implementation of the TCP/IP protocols, with a typical memory footprint of 200 bytes.
+<br>uIP targeted applications are built upon another software tool developed by Dunkels and others at SICS, <a href="http://www.sics.se/%7Eadam/dunkels05using.pdf"><b>protothreads</b> and <b>protosockets</b></a>.
+<br>This software tools provide a sort of cooperative multithreading useful to develop applications abstracting from the 
+explicit state machine style, that is typical of event based systems. Furthermore a 'BSD socket'-like interface is 
+provided for the interaction with the network stack.
+<p>
+<br>uIP is today part of <i>RIME</i>, the network stack of the well-known <a href="http://www.contiki-os.org/"><b>Contiki OS</b></a>, stand-alone versions already exists, targeted to specific architectures.
+<br>This project is based on the <a href="http://code.google.com/p/avr-uip/"> avr-uip</a> port, a stand-alone uIP 
+implementation targeted to AVR cpus.
+<br>A customized version, with some additional applications and some fixes for the UART and 1-Wire library can be found 
+on my github repo <a href="https://github.com/jmondi/hetnet_avr-uip">hetnet_avr-uip</a>. 
+
+<p>
+<h3>Threads and main loop</h3>
+Applications for uIP are usually written using protothreads and protosockets, to communicate with the network stack and to
+support thread execution.
+<br>The application is composed by several concurrent threads:
+<pre>
+<br>  - A thread for distance sensing
+<br>  - A thread for blinking leds
+<br>  - The network application thread
+</pre> 
+<p>
+All that threads are scheduled by the main loop by means of successive invocations.
+<br>A protothread is simply a C function that exploits specific macros to release
+the execution until some specified condition do not evaluate to true.
+<p>
+<br>The simplest possible thread, with minimal complexity is the <i>blink thread</i>:
+<pre><code>
+static 
+PT_THREAD(blink(void))
+{
+	PT_BEGIN(&blink_thread);
+
+		printf("led ON\n");
+		led_on();
+
+		timer_set(&blink_timer, CLOCK_CONF_SECOND);
+		PT_WAIT_UNTIL(&blink_thread, 
+				timer_expired(&blink_timer));
+
+		printf("Led OFF\n");
+		led_off();
+
+		timer_set(&blink_timer, CLOCK_CONF_SECOND);
+		PT_WAIT_UNTIL(&blink_thread,
+				timer_expired(&blink_timer));
+
+	PT_END(&blink_thread);
+}
+</code></pre>
+<p>
+This thread simply lights up a led, wait until a timer is expired and then switch off the led.
+<br>While thread is sleeping, another concurrent one can execute, when blink function is again invoked
+the timer is checked again, and if the condition evaluates to true execution proceeds, otherwise control
+returns to the calling function.
+<p>
+Main loop simply continuously calls protothread functions, performing a primitive scheduling between threads.
+
+<pre><code>
+	while(1){
+		blink(); /*thread*/
+		read_distance(0); /*thread*/
+		uip_len = network_read(); /*get packet from the network*/
+
+		if(uip_len > 0) {
+			if(BUF->type == htons(UIP_ETHTYPE_IP)){
+				/* 
+				 * IP Packet: process headers and call application thread
+				 */
+			}else if(BUF->type == htons(UIP_ETHTYPE_ARP)){
+				/*
+				 * ARP request: reply to ARP req
+				 */
+			}
+		}else if(timer_expired(&periodic_timer)) {
+			/*
+			 * TIMER EXPIRED: ARP update and periodic poll
+			 */	
+		}
+	}
+</code></pre>
+
+<h3>Network Applications</h3>
+
+When an IP packet is received it is passed directly to the network stack that performs some operations on the headers to 
+determinate which kind of packet the application is actually handling.<br>When the network application is called it has 
+to check which flags have been enabled by the stack, and act accordingly (ie. if a re-transmission is requested the
+application has to reproduce the lost packets).
+
+<p>
+Two different applications have been developed for this project.
+<br> The first is an auto refreshing page that displays real-time distances reading the range finder output. The second 
+is a simple HTTP server, that gives back the distance or the temperature sensed by the uController using arguments 
+passed by means of HTTP GET requests. Both the applications reside in the github repo, named <i>simple_ajax</i> and 
+<i>httpd_custom</i> respectivly.
+
+<h2>Testing and Demo</h2>
+Since the board has been developed to perform a demo test in conjunction with a mobile application that performs an
+augmented reality animation, this specific use case will be described.
+<br>Since <i>HetNet</i>, as any other sensor board powered with <i>uIP, Contiki</i> 
+can be connected directly to standard network equipment it is possible to use any kind of setup, totally 
+wired or partially wireless, as we have done in our test-bed.
+
+<h3>Test-bed setup</h3>
+For the demonstration we have performed for the department <i>Career Day</i> event, a simple 802.11g access point 
+has been employed. We have setup a standard wireless network and connected the board directly to one of the access 
+point's  Ethernet ports.
+<br>We have then connected the mobile device to the wireless network and used a simple printed tag to start the 
+measurement.<br>The device start performing HTTP requests to the board's IP address, receiving back HTML text, that 
+is parsed in order to extract relevant information.
+<br>The actual distance is then calculated and displayed in the animation.
+
+<p>
+The brief slides presented on 13-10-2011 are available <a href="hetnet_cday.pdf"> here</a><br>
+A video of one of the preliminary test we have performed is available <a href="http://vimeo.com/30797846"> here </a> (final verion works a lot better :).
+<p>
+<p>
+
+
+<object width="400" height="711"><param name="allowfullscreen" value="true" /><param name="allowscriptaccess" value="always" /><param name="movie" value="http://vimeo.com/moogaloop.swf?clip_id=30797846&amp;server=vimeo.com&amp;show_title=0&amp;show_byline=0&amp;show_portrait=0&amp;color=00adef&amp;fullscreen=1&amp;autoplay=0&amp;loop=0" /><embed src="http://vimeo.com/moogaloop.swf?clip_id=30797846&amp;server=vimeo.com&amp;show_title=0&amp;show_byline=0&amp;show_portrait=0&amp;color=00adef&amp;fullscreen=1&amp;autoplay=0&amp;loop=0" type="application/x-shockwave-flash" allowfullscreen="true" allowscriptaccess="always" width="400" height="711"></embed></object><pfrom> 
+
+
+</BODY></HTML>
