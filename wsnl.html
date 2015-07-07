@@ -1,0 +1,366 @@
+<HTML><HEAD>
+<TITLE>Wireless Sensors Networks Lab</TITLE>
+</HEAD>
+<BODY>
+
+	<h1>An Introduction to EMB-ZRF212 and XMega256a3 platforms</h1>
+	<i>jacopo mondi<br> Suggestions, corrections, everything: jacopo.mondi[AT]gmail[DOT]com</i>
+
+	<a name="intro"><h2>Introduction</h2></a>
+	<h3> About this doc </h3>
+	<p>
+	This document provides some basic hints and examples on how to getting started with the <b>Xmega256a3</b>
+	MCU that is embedded into the <b>Embit EMB-ZRF212 EVB</b>.<br>
+	The target of the examples is the low level interfacing with the MCU sub-systems, 
+	not the ZigBee stack nor the radio communication interface.<br>
+
+	<p>
+	Either if you are just interested in the development of higher level ZigBee compliant applications, sooner or later 
+	you'll have to read/write an IO port, handle some sort of communications or interface with external sensors.<br>
+	Those operations are the target of this documents and associated software.
+
+	<p>
+	<!--
+	This documents is intended to developers who want to use the command line as main development tool on a <i>Linux</i>
+	(or other *NIX system) development box. <br>This is not a naive choice made by an old-fashioned programmer coming straight
+	from the 70's. It is, instead, the only way to fully understand what is really going on during the development 
+	process, and so, being able to fix the majority of problems you will have to face.
+	-->
+	This documents provides an introduction to the available documentation about the <b>Xmega256a3</b> MCU 
+	(micro-controller unit) and the custom <b>EMB-ZRF212 EVB</b> (Evaluation Board) available in  Wireless System Lab @CS unibo.<br>
+ 	It also provides some useful pointers (links, tips and so on) for developers that are completely new to 
+	firmware development or are used to older ATMEL devices, or other manufacturer's devices.
+	<p>
+	The default way to specify actions and commands in the document is supposed to be a default terminal emulator 
+	running in a <i>Linux</i> (or similar *NIX) development box.<br><br>
+
+	If you want to use some integrated development environment (IDE), such as the official <i>ATMEL AVR Studio IDE</i>, 
+	you have to switch to a Windows box, and consult the official ATMEL documentation freely available on-line.
+	<p>
+
+	Also, if you are just interested working with the <i>ATMEL BitCloud</i> ZigBee stack this documents will not help you
+	in any way.<br>
+ 	Refer instead to the documentation provided in the CD-ROMs and on-line by both ATMEL and EMBIT. 
+	<p>
+
+	The software is provided 'as it is' since it does nothing particularly useful. No license of any-kind is applied, so do
+	what you want with it.
+
+	<h3> XMega Series </h3>
+	The AVR ATXMega series from ATMEL introduces many new features and capabilities,
+	that lead to new abstractions and (sometimes obscure) software mechanisms, providing 
+	a sensible shift of code complexity and modularity respect the well known AVR ATMega series.
+	<p>
+	The provided (very simple) examples introduce some <i>'hands-on'</i> techniques for manipulating
+	low level functions such as USART and ADC.<br>
+	The included <code>Makefile</code> also provide an introduction on how software for AVR ATMEL gets
+	build and uploaded to the board.
+	<p>
+
+	<a name="pre"><h2>Preliminary</h2></a>
+	To fully understand how this software works, gets build and uploaded, some preliminary
+	readings are quite mandatory.
+	<p>
+	<h3>Basics</h3>
+	If you are very new to microcontrollerdome (that is, for the record, the obscure land of memory and 
+	resource severely constrained processors), it could be useful reading some pages from the <a href="www.arduino.cc">
+		arduino web page</a> since some high-level concepts (Serial communication, ADC, gpio handling etc) 
+	are common to all the platforms.
+
+	<p>
+	<a href="http://arduino.cc/en/Tutorial/HomePage">Here</a> you'll find many tutorials, about basic and more advanced 
+	topics and typical MCU operations.<br>
+	A good understanding of basic I/O (both digital and analog), serial communication protocols (USART, SPI, I2C), Analog to
+	Digital Converters (ADC), is the bare minimum to start with a more advanced processor like 
+	Xmega256a3 is.
+	<p><i>
+	WARNING: ignore the code examples in the arduino wiki. You will have nothing like Arduino
+	libraries or Arduino IDE for this platforms, just ANSI C and a bunch of registers.
+	</i><p>
+
+	<h3> EMBIT Doc</h3>
+	Technical documentation provided by EMBIT, the EMB-ZRF212 board manufacturer, can be found under the Doc/ directory in 
+	the included CD-ROM, providing an introduction to the board design and layout.<br>
+	A complete list of board connectors and installed peripherals can be found in the <b>"EMB-ZRF2xx-EVB.pdf"</b>
+	document, while technical characteristics, such as size, electrical characteristics, pin associations between board
+	and MCU can be found in the <b>"EMB-ZRF2xx.pdf"</b> document.<br>
+	An overview on the board programming model and pre-installed bootloader information are also included 
+	in the <b>"EMB-ZRF2xx-Programming-Guide.pdf"</b> document.<br>
+
+	<p>
+	<h3> ATMEL DOC</h3>
+	The datasheets provided by ATMEL (available under the Datasheet/ dir) features the new datasheet style for XMega series.<br>
+	A general datasheet for all the family is provided (called <b>"ATXMEGA256A3.pdf"</b>).<br>
+	This documents describes the MCU pin layout and alternate pin functions, common to all the XMega series.
+	It also briefly introduces the available peripherals and buses, in a very short and descriptive way.<br><br>
+	A manual specific to the XMega256a3 is also included, called <b>"ATXMEGA256A3-Reference Manual.pdf"</b>.<br>
+	This document is quite longer and fully describes all the functionality and possible configurations for this specific
+ 	device <i>(this one is the real datasheet)</i>.<br>
+	The antenna datasheets are also included.
+
+	<p>
+	ATMEL also provides an impressive collection of on-line documentation, with software examples 
+	and documents specific to single processor's subsystems (such as <b>"Getting started with ATXMega ADC"</b> and so on).<br>
+	Those documents are used to guide the developers in the transition from the ATMega series to the new XMega one.
+
+	<p>
+	You can find everything <a href="http://www.atmel.com/dyn/products/product_docs.asp?category_id=163&family_id=607&subfamily_id=1965&part_id=4304"> here</a>:<br>
+	This documentation is not all mandatory, but some readings are anyway recommended.
+	<p>
+	In particular:
+	<pre><b>
+	"Atmel AVR1927: XMEGA-A1 Xplained Getting Started Guide"<br>
+	"AVR1000: Getting Started Writing C-code for XMEGA"<br>
+	"AVR1005: Getting started with XMEGA"<br></b>
+	</pre>
+	Some articles also describes some (very) advanced features such as DMA, Event System, Clock Subsystem, DAC, that are not 
+	mandatory but could be useful to improve your firmware development skills.  
+
+	<p>
+	<a name="tips"><h2>Tips (and tricks)</h2></a>
+	<h3> Building </h3>
+	In order to successfully build software programs for XMega processor you will need a fully working installation
+	of the <i>avr-gcc tool-chain</i>.<br>
+	As any other cross-compiling tool-chain the avr-gcc suite includes a compiler, a linker, an object handler and 
+	many other tools such as profilers and debuggers, all targeted to the AVR architecture.<br>
+	A binary packaged version of the tool-chain is provided in many Linux distributions (usually called avr-gcc or similar).<br>
+
+	However some versions of the pre-built tool-chain do not support the XMega family.<br>
+	You can verify this checking the <b>'Known MCU names'</b> section in the 
+	<br><code>$ avr-gcc --target-help</code><br> command output.<br><br>
+	If no ATXMega device is mentioned, so you have to compile your own version of the tool-chain.<br> 
+	This operation could be automatized using the <i>'Bingo scripts'</i> you can find 
+	<a href="http://www.avrfreaks.net/index.php?name=PNphpBB2&file=viewtopic&t=42631">here.</a>
+		<p>
+
+Carefully read the instructions and proceed compiling, then verify that the chosen install directory is included in your 
+default system path. After compiling the tool-chain, remove the default avr-gcc package and try <br>
+<code>$ which avr-gcc</code>.<br>
+If nothing it's found, then add the install path (default one is /usr/local/avr/) to your .bashrc or .zshrc...
+
+	<p>
+
+	<h3> Coding </h3>
+	As the ATMEL provided documentation suggests, the XMega series introduces a totally new coding style in firmware
+	development process.<br>
+	<p>
+	The header files (specifically the <code>'iox256a3.h'</code>) introduce a new name convention for bit-fields groups and masks.<br>
+	Two different macros are now associated to each bit in a register , one that specify the position <i>(BITNAME_bp)</i> 
+	and one that specify the bit-shifting operation used to handle the bit <i>(BITNAME_bm)</i>.
+	The same happens for bit-groups, but corresponding macros end with the <i>_gm</i> and <i>_gp</i> suffixes.
+	<p>
+	In the simplest provided example (<code>src/blink.c</code>) you'll find some example macros 
+	following this new coding style.<br>
+	This enables the developers to speed up the bit groups selection and bit setting or clearing.<br>
+	It is suggested to 	open and consult the IO header file (<code>'iox256a3.h'</code>) while writing code, 
+	to fully exploits the new _bm, _bp, _gm, _gp macros.
+	<p>
+	<pre><code> 
+				/*=== from blink.c ===*/
+				#define LED1_bm (1<<0)
+				#define LED2_bm (1<<1)
+				#define LED3_bm (1<<2)
+				#define LED1_bp 0
+				#define LED2_bp 1
+				#define LED3_bp 2
+
+				/*=== from iox256a3.h ===*/
+				/* ADC_CH.MUXCTRL  bit masks and bit positions */
+				#define ADC_CH_MUXPOS_gm  0x78  /* Positive Input Select group mask. */
+				#define ADC_CH_MUXPOS_gp  3  /* Positive Input Select group position. */
+				#define ADC_CH_MUXPOS0_bm  (1<<3)  /* Positive Input Select bit 0 mask. */
+				#define ADC_CH_MUXPOS0_bp  3  /* Positive Input Select bit 0 position. */
+				#define ADC_CH_MUXPOS1_bm  (1<<4)  /* Positive Input Select bit 1 mask. */
+				#define ADC_CH_MUXPOS1_bp  4  /* Positive Input Select bit 1 position. */
+				#define ADC_CH_MUXPOS2_bm  (1<<5)  /* Positive Input Select bit 2 mask. */
+				#define ADC_CH_MUXPOS2_bp  5  /* Positive Input Select bit 2 position. */
+				#define ADC_CH_MUXPOS3_bm  (1<<6)  /* Positive Input Select bit 3 mask. */
+				#define ADC_CH_MUXPOS3_bp  6  /* Positive Input Select bit 3 position. */
+	</code></pre>
+	Also the I/O ports handling model has changed, since now every ports has  many registers that could be used 
+	to manipulate a single pin operations.<br>
+	Please refer to chapter 13 of the atxmega256a3 manual, particularly section 13.14 to get a full description of the new
+	registers' functions.
+	<p><table width="100%" border="0">
+		<tr>
+			<td align="left" valign="top" width="50%">
+				<pre><code>
+				/*=== XMEGA ===*/
+				/*set direction*/
+				PORTB_DIRSET |= LED1_bm;
+				/*set the bit*/
+				PORTB_OUTSET |= LED1_bm;
+				/*clear the bit*/
+				PORTB_OUTCLR |= LED1_bm;
+				</code></pre>
+			</td>
+			<td align="left" valign="top" width="50%">
+				<pre><code>
+				/*=== ATMEGA ===*/
+				/*set direction*/
+				DDRB |= _BV(DDRB1);
+				/*set the bit*/
+				PORTB |= _BV(PORTB1);
+				/*clear the bit*/
+				PORTB &= ~_BV(PORTB1);
+				</code></pre>
+			</td>
+		</tr>
+	</table><p>
+
+			
+	<p>
+	The newly introduced modular device design (check on-line ATMEL documentation to know further about)
+	enables the developers to map the processor's registers used for configuring peripherals and input/output ports
+	into plain C structures, and access sub-register and bit fields in an <i>"object oriented"</i> coding style.<br>
+	This features dramatically speeds up development process, since all the registers related to a specific subsystem 
+	are tightly coupled into a single data structure.<br>
+ 	This structure could be  directly manipulated or reassigned if another instance of the same 
+	subsystem has to be used (now you can switch from one USART interface to another simply changing a pointer value).
+	<p>
+	To understand how this feature can be exploited two different examples are provided.<br>
+	<code>usart.c</code> handles the USARTD0 interface in the 'old fashioned' way, while <code>usart_with_structs.c</code>
+	uses the new memory mapping functionality.<br>
+	To understand why the new coding style is much more flexible, try to switch from using USARTD0
+ 	(the rs232 port on EMB-ZRF212) to USARTD1 (the USB one on EMB-ZRF212) in the previously mentioned files. 
+	<p><table width="100%" border="0">
+		<tr>
+			<td align="left" valign="top" width="50%">
+				<pre><code>
+/*==== from usart.c ====*/
+
+
+int main(...){
+	...
+	/*zero control registers*/
+	USARTD0_CTRLA = 0x00;
+	USARTD0_CTRLB = 0x00;
+	USARTD0_CTRLC = 0x00;
+	/*setup USARTD0 baudrate*/
+	USARTD0_BAUDCTRLA = baud;
+	USARTD0_BAUDCTRLB = (0x0f&(baud>>8));
+	/*set 8bit word size*/
+	USARTD0_CTRLC = (USART_CHSIZE0_bm | USART_CHSIZE1_bm);
+	/*enable TX RX*/
+	USARTD0_CTRLB = USART_TXEN_bm | USART_RXEN_bm;
+	....
+}
+				</code></pre>
+			</td>
+			<td align="left" valign="top" width="50%">
+				<pre><code>
+/*=== from usart_with_structs.c ===*/
+#define	USART  USARTD0 /*<--- CHANGE THIS TO SWITCH INTERFACE*/
+
+int main(...){
+...
+	/*zero control registers*/
+	USART.CTRLA = 0x00;
+	USART.CTRLB = 0x00;
+	USART.CTRLC = 0x00;
+	/*setup USART baudrate*/
+	USART.BAUDCTRLA = baud;
+	USART.BAUDCTRLB = (0x0f&(baud>>8));
+	/*set 8bit word size*/
+	USART.CTRLC = (USART_CHSIZE0_bm | USART_CHSIZE1_bm);
+	/*enable TX RX*/
+	USART.CTRLB = USART_TXEN_bm | USART_RXEN_bm;
+....
+}
+				</code></pre>
+			</td>
+		</tr>
+	</table><p>
+	<p>
+	Many operations could be speed up with a minimal knowledge of AVR assembly.<br>
+	This enables the developers to exploit new <i>AVR assembly</i> features, such as the indirect access with post/pre
+	decrement, or efficient memory mapped I/O.<br><p>
+	To reduce the produced code size could also be useful to learn how efficiently use variables data type, and how their
+	definition and use produce different assembly code.<br><p>
+
+	The following loops, functionally equivalent, produce code of different size (assembly code is specified after each C instruction).<br>
+
+	<p><table width="100%" border="0">
+		<tr> <i> from "AVR035: Efficient C Coding for 8-bit AVR microcontrollers"</i>
+			<td align="left" valign="top" width="50%">
+				<pre><code>
+unsigned char count8 = 5; 
+// LDI R16,5 ;init variable
+
+
+/* Decrement loop counter and check for zero */
+do{
+}while(--count8);
+//?0004:DEC R16 ;decrement
+//BRNE ?0004 ;branch if not equal
+
+				</code></pre>
+			</td>
+			<td align="left" valign="top" width="50%">
+				<pre><code>
+	unsigned int count16 = 6; 
+	// LDI R24,LOW(6) ;Init variable, low byte
+	// LDI R25,0 ;Init variable, high byte
+
+	/* Decrement loop counter and check for zero*/
+	do{
+	}while(--count16);
+	//?0004:SBIW R24,LWRD(1) ;Subtract 16-bit value
+	//BRNE ?0004 ;Branch if not equal
+				</code></pre>
+			</td>
+		</tr>
+	</table>
+	The loop using the 8bit counter reduce to 6 byte of produced code, the one using the 16bit counter to 8byte.<br> 
+	This could seems not a big deal, but when handling lot of global variables their definition and data types could lead to very different object code size. 
+
+	<p>
+
+	All that features are fully described in the 
+	<b>"AVR035: Efficient C Coding for 8-bit AVR microcontrollers"</b> document provided by ATMEL on-line reference.
+
+	<p>
+	<h3> Testing the examples </h3>
+	To compile and upload the examples, simply go to the <code>src/</code> directory and type 
+	<br><code>$ make</code><br> to build the executable (.hex extension), and <br><code>$ make upload</code><br> to 
+	flash the firmware on the device.<br>
+	Refer to <b>"EMB-ZRF2xx-Programming-Guide.pdf"</b> to know how to restart the board in programming mode.<br>
+	
+	<p>
+	To change the example file you are building, edit the <code>src/Makefile SOURCE</code> variable.<br>
+	You will find binaries into the <code>bin/</code> directory.<br>
+	Remember to clean up with <br><code>$ make clean</code><br> when you are done.<br>
+
+	<p>
+	Before uploading the built file to the board verify that the selected port in the 
+	<code>src/Makefile PORT</code> variable matches the port the board is attached to.<br>
+	You can find it out connecting the USB cable (both ends) and powering the board up.<br>
+	Type <br><code>$ dmesg |grep tty</code><br> and check the last entry  mentioning the FTDI keyword.
+ 	Edit the <code>Makefile</code> accordingly.
+
+	<p>
+	<h3>Source Code</h3>
+	The src/ directory contains:<p>
+	<pre>
+	<a href="./wsnl/blink.c">blink.c</a><br> 
+		blink 2 led. Learn the new _bm and _bp macro style, and the new OUTSET OUTCLR registry.<p>
+	<a href="./wsnl/usart.c">usart.c</a><br> 
+		setup a serial communication the "old fashioned" way, manipulating the single registers.<p>
+	<a href="./wsnl/usart_with_structs.c">usart_with_structs.c</a><br> 
+		setup a serial communication the new way, using the flexible memory mapped IO model.<p>
+	<a href="./wsnl/adc.c">adc.c</a><br> 
+		setup ADCA and read from channel 4 (connected to a trimmer on EMB-ZRF212 board). 
+		The resulting value is then sent out on the USARTD0 channel.<p>
+	</pre>
+
+	<p>
+	With the firmware examples, a simple test program it's also provided (<code>src/read_serial.c</code>).<br>
+ 	This application shows how to open and setup a serial communication with the board.<br>
+	This example is tested with the adc.c firmware and displays messages incoming from the MCU 
+	(the voltage generate by the on-board variable resistor).<br>
+	<p>
+	<h2>Conclusions</h2>
+	You can download the whole archive with source code <a href="./wsnl_x256a3">here</a><br>
+	<p>
+	If you want to contribute to this page, with corrections, new code examples etc, please let me know!
+</BODY>

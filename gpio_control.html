@@ -1,0 +1,228 @@
+<HTML><HEAD><title>GPIO Control: Doing that from kernel and user space</title></HEAD>
+	<BODY>
+
+
+	<h1>GPIO Control: Doing that from kernel and user space</H1>
+	<i>jacopo mondi<br> Suggestions, corrections, everything: jacopo.mondi[AT]gmail[DOT]com</i>
+	<address>tags: beagleboard, gpio, device driver, sysfs</address>
+<h2>Introducing GPIO</h2>
+As we all know beagleboard has an expansions connector where multiple signals can be routed via kernel or u-boot multiplexing.
+Many different expansion interfaces can be routed on those pins, such as additional UARTs, SPIs and many more.
+Major resource for this is <a href="http://elinux.org/BeagleBoardPinMux">elinux.org/BeagleBoardPinMux</a> where you can 
+find more informations.  Our interest for the expansion connector in this example is pointed to the simplest kind of IO 
+port available on common embedded platforms: <i>GPIOs</i> <small>(in brief, GPIOs are single digital pins that could be moved high or low as user desires)</small>.
+
+<h3>Enabling GPIOs on beagleboard expansions connector</h3>
+In order to use GPIOs on beagleboard expansion connector the appropiate signals have to be routed to the right balls.
+Modification to the multiplexer settings can be done via kernel or u-boot patching. Again, that argument is out of our
+scope, and again elinux.org is our preferred source of information.  Fortunately, some GPIOs are routed by default on
+main expansion connector, and we could safely use them for our example. You can refer to <a href="http://beagleboard.org/static/BBSRM_latest.pdf"> Beagleboard Reference Manual</a> to find out which GPIOs are ready to be used, without getting
+dirty with low level bootloader or kernel patching.
+
+<h2>Controlling GPIOs from user space</h2>
+There are basically two ways to control a GPIO pins from userspace:<em> memory mapping</em> or <em>sysfs</em>.<br>
+Memory mapping method  just requires a <em>mmap</em> call, and  some datasheet readings. Simply put: it maps the desired memory area into
+a userspace buffer to make possible modify it.<br>
+I suppose that just 16bits are necessary for controlling a GPIO, since the PADCONF array is composed by word-sized 
+(32bits) registers each one controlling 2 pins...
+<br>
+The second method exploits  <em>sysfs </em> power, using its so called 'event interface'.
+Symply put (again): you write specific commands to a file and kernel acts accordingly. Nice uh?
+<br><p>
+
+Three actions are possible on a sysfs entry in order to control a GPIO pin:
+<ul>
+	<li><i>Export</i></li>
+	<li><i>Write high/low</i></li>
+	<li><i>Unexport</i></li>
+</ul>
+
+<p>
+Before you can do anything on the chosen pin you have to export it.<br>
+Suppose you want to use gpio139 (pin 3 on C4 expansion connector), simply write:<p>
+<pre><code> % echo 139 &gt; /sys/class/gpio/export</code></pre><p>
+A new sysfs entry called gpio139 will appear under <em>/sys/class/gpio/</em> directory.<br>
+Now it's possible to control pin status:<p>
+<pre><code>
+% echo "low"  &gt; /sys/class/gpio/gpio139/direction
+% echo "high" &gt; /sys/class/gpio/gpio139/direction
+</code></pre>
+<p>
+You will find more useful files under <em>gpio139</em> directory, such as <em>value</em> that reports the actual pin status.<br>
+When you don't need the gpio any more you can unexport it.<p>
+<pre><code>
+% echo 139 &gt; /sys/class/gpio/unexport
+</code></pre><p>
+We all agree, sysfs is great, and if you have do bash scripting is quite the only feasible solution.
+
+<h1>The kernel side</h1>
+GPIO is probably one of the simplest examples of how kernel developers exposes API not only for user space applications, 
+but also for other kernel modules and drivers.
+<p>
+Linux kernel provides a nice library called <em>gpiolib </em>that exposes some common gpio related functions, 
+in order to abstract a little from bare hardware gpio controller installed on you board.<br>
+
+Kernel documentation comes with a useful gpio.txt file, which is worth to read in order to understand how
+<em>gpiolib</em> behaves and what does it provide to other kernel modules.<br>
+
+<p>
+Basically the necessary operations are the three we have seen before, but this time those tasks are accomplished 
+by kernel code.<br>
+Furthermore, gpiolib provides a sysfs compatibility layer (exactly the one we have used before from userspace).<p>
+
+Now, why the hell one should write a kernel module when you could do everything you want, not only from user space,
+but with a single 4 line bash file??<br>
+I guess the 'because it's funny' answer is not the right one for many of us...<br>
+<P>
+The real reason why gpio are interesting also in kernel space are interrupts.<p>
+
+First of all, it's impossible to manage interrupts within user space applications (that's not completely true)
+and a gpio, as any other digital line that can be driven high or low, can be used for triggering interrupts.<br>
+Before presenting the code, we have to learn how to manage interrupts and what kind of issues are involved in
+interrupts handling.
+<p>
+The best available resource is chapter 10 of <strong>Linux Device Driver </strong>from which you can learn everything you need to understand what is going on there (and much more).
+
+<h3>Hardware</h3>
+
+The hardware wiring is just a simple button switch connected to a beagleboard GPIO pin. That switch is kept high with a 2K pull up resistor, but when pressed connects the GPIO to GND. To get a visual feedback of what is going on, connect a led to another pin of you choice, this will be the 'blinking' led.
+
+<h3>Kernel Module</h3>
+Skipping all the details related to device driver writing, only the interesting code sections are shown here, such as interrupt installing, and interrupt low and top halves.<p>
+
+In module init we have to request the gpio we desire, set its direction and finally set up a <em>workqueue</em> 
+to be used for spawning a kernel thread to manage interrupt.
+<p>
+<pre><code>
+int blink_gpio=139;/*gpio 3 on expansion*/ /*module param*/
+int interrupt_gpio=138;/*GPIO 5 on expansion*/ /*module param*/
+...
+if (!gpio_is_valid(blink_gpio)){
+  printk(KERN_ALERT "The requested GPIO is not available \n");
+  retval=-EINVAL;
+  goto invalid;
+}
+if (!gpio_is_valid(interrupt_gpio)){
+  printk(KERN_ALERT "The requested GPIO is not available \n");
+  retval=-EINVAL;
+  goto invalid;
+}
+/*we have requested  valid gpios*/
+if(gpio_request(blink_gpio, "blinking_led")){
+  printk(KERN_ALERT "Unable to request gpio %d", blink_gpio);
+  retval=-EINVAL;
+  goto invalid;
+}
+if(gpio_request(interrupt_gpio, "gpio_interrupt")){
+  printk(KERN_ALERT "Unable to request gpio %d",interrupt_gpio);
+  retval=-EINVAL;
+  goto free_and_return1;
+}
+
+/*set gpio direction*/
+if( (dir_err=gpio_direction_output(blink_gpio, value)) &lt; 0 ){
+  printk(KERN_ALERT "Impossible to set output direction");
+  retval=-EINVAL;
+  goto free_and_return2;
+}
+if( (dir_err=gpio_direction_input(interrupt_gpio)) &lt; 0 ){
+  printk(KERN_ALERT "Impossible to set input direction");
+  retval=-EINVAL;
+  goto free_and_return2;
+}
+</code></pre>
+<p>
+As said before interrupt handling is usually done using a top half handler, that starts some work that will be
+accomplished in a later time, in a context that is less critical than an handler (where some constraints such as high
+speed, no sleeping  and low latency have to be respected).
+
+<p>
+To do so, usually  <em>workqueues</em> or<em> kernel tasklets</em> are employed.
+<p>
+
+In this example we will install a workqueue with an associated work, that will be spawned by top half interrupt handler
+in order to complete the desired task (invert the led  state).
+
+<p>
+<pre><code>
+static void
+change_led_state
+(struct work_struct *work)
+{
+  int new_value = invert_value(value);
+  gpio_set_value(blink_gpio, new_value);
+  value = new_value;
+
+  return;
+}
+
+/*set up work queue*/
+ if ( !(wq=create_singlethread_workqueue("blink_wq")) ){
+   printk(KERN_ALERT "unable to setup workqueue\n");
+   retval=-EINVAL;
+   goto free_and_return2;
+ }
+
+ /*setup work struct*/
+ INIT_DELAYED_WORK(&amp;work, change_led_state);
+ if (&amp;work==NULL){
+   printk(KERN_ALERT "Unable to set work to be executed\n");
+   retval=-EINVAL;
+   goto destroy_workqueue;
+ }</code></pre>
+
+<p>
+Finally we have to install and write the handler:
+<p>
+<pre><code>
+/*
+ * Interrupt Handler
+ */
+irqreturn_t change_state_interrupt
+(int irq, void *dev_id, struct pt_regs *regs)
+{
+  printk(KERN_ALERT "Interrupt\n");
+  /*send work to be scheduled*/
+  queue_delayed_work(wq, &amp;work, (long) 0);
+  return IRQ_HANDLED;
+}
+...
+...
+ /*install interrupt handler*/
+ if ( (irq_line=gpio_to_irq(interrupt_gpio)) &lt; 0){
+   printk(KERN_ALERT "Gpio %d cannot be used as interrupt",interrupt_gpio);
+   retval=-EINVAL;
+   goto destroy_workqueue;
+ }
+
+ if ( (irq_req_res = request_irq(irq_line,
+   change_state_interrupt, IRQF_TRIGGER_FALLING,
+   "gpio_change_state", NULL)) &lt; 0){
+   if (irq_req_res == -EBUSY)
+     retval=irq_req_re;
+   else
+     retval=-EINVAL;
+   goto destroy_workqueue;
+ }</code></pre>
+<p>
+The interrupt handler does nothing more than scheduling the <em>work</em> on the workqueue <em>wq</em> to be executed.
+<br>
+The <em>workqueue </em>will request a kernel thread that will execute the <em>change_led_state </em>function, that will run concurrently to the rest of the device driver.
+
+<h2>Conclusions</h2>
+This is just one of the simplest examples about GPIO and interrupt  handling.
+<p>
+GPIO is the basical form of communication available in almost all platforms, and a good understanding of the available software support is necessary to start working with embedded Linux.
+
+<p>
+GPIOs are employed in a number of different situations.
+
+SPI protocol is a good example. In this protocol only the 'master' device can start the communication.
+Sometimes 'slave devices' want to start communicating too, but it is necessary to wake-up the master and ask it to start the communication first.
+In that situations, an interrupt connected to a GPIO is the easiest and faster solution, given that no additional hardware is required (1 wire connection and eventually a pull up resistor) and the required code is relatively small.
+<br>
+	<br>
+	[ <a href="./index.html"><strong>Home</strong></a> ]
+	<br><br>
+</BODY>
+</HEAD>
