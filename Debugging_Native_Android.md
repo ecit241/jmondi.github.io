@@ -71,7 +71,7 @@ This is not enough by the way, since we need to know exactly where the **.text**
 We can use the *objdump* tool to analyze the .so and find this out:
 
 ```
-jmondi@w540:~$ arm-eabi-objdump -h out/target/product/PRODUCT/symbols/system/lib/hw/camera.omap4.so  | grep text
+jmondi@w540:~$ arm-eabi-objdump -h out/target/product/YOURPRODUCT/symbols/system/lib/hw/camera.omap4.so  | grep text
 00043d0c  00024630  00024630  00024630  2**3
 ```
 
@@ -82,8 +82,8 @@ The second value in the output (**_0x00024630_**) is the displacement, thus we c
 Let's get back to our debugger console, and proceed in loading symbols; the service symbols first, then the library's ones at the correct memory location.
 
 ```
-(gdb) file out/target/product/dl40pb/system/bin/service
-(gdb) add-symbol-file camera.omap4.so 0x40C78630 
+(gdb) file out/target/product/YOURPRODUCT/symbols/system/bin/service
+(gdb) add-symbol-file out/target/product/YOURPRODUCT/symbols/system/lib/hw/camera.omap4.so 0x40C78630
 add symbol table from file "camera.omap4.so" at .text_addr = 0x40c78630
 ```
 
